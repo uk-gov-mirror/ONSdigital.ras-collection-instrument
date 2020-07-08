@@ -18,6 +18,14 @@ FILE_NAME_LENGTH_ERROR = 'The file name of your spreadsheet must be less than 50
 RABBIT_QUEUE_NAME = 'Seft.Responses'
 
 
+class FileTooSmallError(Exception):
+    pass
+
+
+class SurveyResponseError(Exception):
+    pass
+
+
 class SurveyResponse(object):
     """
     The survey response from a respondent
@@ -39,11 +47,14 @@ class SurveyResponse(object):
 
         if self.check_if_file_size_too_small(file_size):
             log.info('File size is too small')
-            return 'False'
-        elif not self.check_if_file_size_too_small(file_size):
+            raise FileTooSmallError()
+        else:
             log.info('File size is correct')
             json_message = self._create_json_message_for_file(file_name, file_contents, case_id, survey_ref)
-            return send_message_to_rabbitmq_queue(json_message, tx_id, RABBIT_QUEUE_NAME)
+            sent = send_message_to_rabbitmq_queue(json_message, tx_id, RABBIT_QUEUE_NAME)
+            if not sent:
+                log.error("Error sending response to rabbit")
+                raise SurveyResponseError()
 
     @staticmethod
     def initialise_messaging():
